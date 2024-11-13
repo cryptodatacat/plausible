@@ -61,8 +61,8 @@ services:
       - HTTP_PORT
       - HTTPS_PORT
       # databases: https://github.com/plausible/community-edition/wiki/configuration#database
-      - DATABASE_URL
-      - CLICKHOUSE_DATABASE_URL
+      - DATABASE_URL=postgres://postgres:postgres@plausible_db:5432
+      - CLICKHOUSE_DATABASE_URL=http://plausible_events_db:8123
       # Google: https://github.com/plausible/community-edition/wiki/configuration#google
       - GOOGLE_CLIENT_ID
       - GOOGLE_CLIENT_SECRET
