@@ -1,24 +1,14 @@
 services:
-  plausible_db:
-    image: postgres:16-alpine
-    restart: always
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=postgres
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
-      start_period: 1m
-
   plausible_events_db:
     image: clickhouse/clickhouse-server:24.3.3.102-alpine
+    container_name: plausible_events_db
     restart: always
+    networks:
+      - app
     volumes:
       - event-data:/var/lib/clickhouse
       - event-logs:/var/log/clickhouse-server
       - ./clickhouse/logs.xml:/etc/clickhouse-server/config.d/logs.xml:ro
-      # This makes ClickHouse bind to IPv4 only, since Docker doesn't enable IPv6 in bridge networks by default.
-      # Fixes "Listen [::]:9000 failed: Address family for hostname not supported" warnings.
       - ./clickhouse/ipv4-only.xml:/etc/clickhouse-server/config.d/ipv4-only.xml:ro
     ulimits:
       nofile:
@@ -34,13 +24,16 @@ services:
 
   plausible:
     image: ghcr.io/plausible/community-edition:v2.1.4
+    container_name: plausible
     restart: always
     command: sh -c "/entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
     depends_on:
-      plausible_db:
-        condition: service_healthy
       plausible_events_db:
         condition: service_healthy
+    networks:
+      - app
+    ports:
+      - '127.0.0.1:8080:8000'
     volumes:
       - plausible-data:/var/lib/plausible
     ulimits:
@@ -49,51 +42,25 @@ services:
         hard: 65535
     environment:
       - TMPDIR=/var/lib/plausible/tmp
-      # required: https://github.com/plausible/community-edition/wiki/configuration#required
-      - BASE_URL=${BASE_URL}
-      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
-      # optional: https://github.com/plausible/community-edition/wiki/configuration#optional
-      # registration: https://github.com/plausible/community-edition/wiki/configuration#registration
-      # - TOTP_VAULT_KEY
-      # - DISABLE_REGISTRATION
-      # - ENABLE_EMAIL_VERIFICATION
-      # web: https://github.com/plausible/community-edition/wiki/configuration#web
-      - HTTP_PORT
-      - HTTPS_PORT
-      # databases: https://github.com/plausible/community-edition/wiki/configuration#database
-      - DATABASE_URL=postgres://postgres:postgres@plausible_db:5432/plausible
-      - CLICKHOUSE_DATABASE_URL=http://plausible_events_db:8123/plausible
-      # Google: https://github.com/plausible/community-edition/wiki/configuration#google
-      # - GOOGLE_CLIENT_ID
-      # - GOOGLE_CLIENT_SECRET
-      # # geolocation: https://github.com/plausible/community-edition/wiki/configuration#ip-geolocation
-      # - IP_GEOLOCATION_DB
-      # - GEONAMES_SOURCE_FILE
-      # - MAXMIND_LICENSE_KEY
-      # - MAXMIND_EDITION
-      # # email: https://github.com/plausible/community-edition/wiki/configuration#email
-      # - MAILER_ADAPTER
-      # - MAILER_EMAIL
-      # - MAILER_NAME
-      # - SMTP_HOST_ADDR
-      # - SMTP_HOST_PORT
-      # - SMTP_USER_NAME
-      # - SMTP_USER_PWD
-      # - SMTP_HOST_SSL_ENABLED
-      # - POSTMARK_API_KEY
-      # - MAILGUN_API_KEY
-      # - MAILGUN_DOMAIN
-      # - MAILGUN_BASE_URI
-      # - MANDRILL_API_KEY
-      # - SENDGRID_API_KEY
-    networks:
-      - dokploy-network
+      - BASE_URL=https://xxxxxx.io
+      - SECRET_KEY_BASE=Uxxxxxxg==
+      - DATABASE_URL=postgres://postgres:xxxxx@172.18.0.1:5432/plausible_db
+      - MAILER_EMAIL=send@xxxx.io
+      - MAILER_NAME=xxxx.io
+      - SMTP_HOST_ADDR=mail.xxxx.io
+      - SMTP_HOST_PORT=465
+      - SMTP_USER_NAME=send@xxxxx.io
+      - SMTP_USER_PWD=xxxxx
+      - SMTP_HOST_SSL_ENABLED=true
 
 volumes:
-  db-data:
   event-data:
+    driver: local
   event-logs:
+    driver: local
   plausible-data:
+    driver: local
 
 networks:
-  dokploy-network:
+  app:
+    external: true
